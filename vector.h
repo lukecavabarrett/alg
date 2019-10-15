@@ -91,6 +91,8 @@ namespace alg {
 
         void pop_back();
 
+        void clear() noexcept ;
+
     };
 
     template<typename T, typename Allocator>
