@@ -239,7 +239,7 @@ void vector<T, Allocator>::push_back(const T &value) {
 template<typename T, typename Allocator>
 void vector<T, Allocator>::push_back(T &&value) {
     reserve_for_insertion();
-    _allocator.construct(_data + _size,value);
+    _allocator.construct(_data + _size,std::move(value));
     ++_size;
 }
 

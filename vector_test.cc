@@ -83,15 +83,14 @@ TEST(Vector,Move){
     EXPECT_EQ(v.size(),1);
     EXPECT_GE(v.capacity(),1);
     EXPECT_EQ(v.back(),a);
-    std::cout << a << std::endl;
 
     v.push_back(a);
-
     EXPECT_EQ(v.back().size(),strlen(s));
     EXPECT_EQ(a.size(),strlen(s));
+
     v.push_back(std::move(a));
     EXPECT_EQ(v.back().size(),strlen(s));
-    // a might be unvalidated now
+    EXPECT_EQ(a.size(),0);
 }
 }
 }
