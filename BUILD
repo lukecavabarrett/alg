@@ -35,3 +35,28 @@ cc_test(
         "@googletest//:gtest_main",
     ],
 )
+
+cc_library(
+    name = "rolling_hash",
+    hdrs = ["rolling_hash.h"],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+cc_library(
+    name = "rolling_hash_multi",
+    hdrs = ["rolling_hash_multi.h"],
+    visibility = ["//visibility:public"],
+    deps = [],
+)
+
+cc_test(
+    name = "rolling_hash_test",
+    srcs = ["rolling_hash_test.cc"],
+    deps = [
+        ":rolling_hash",
+        ":rolling_hash_multi",
+        "//aux:pretty_print",
+        "@googletest//:gtest_main",
+    ],
+)
