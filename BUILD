@@ -14,6 +14,22 @@ cc_test(
 )
 
 cc_library(
+    name = "stack",
+    hdrs = ["stack.h"],
+    visibility = ["//visibility:public"],
+    deps = [":vector"],
+)
+
+cc_test(
+    name = "stack_test",
+    srcs = ["stack_test.cc"],
+    deps = [
+        ":stack",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "binary_node",
     hdrs = ["binary_node.h"],
     visibility = ["//visibility:public"],
