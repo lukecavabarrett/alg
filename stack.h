@@ -15,11 +15,16 @@ public:
     using Container::operator=;
     using Container::empty;
     using Container::size;
+    using Container::clear;
     inline auto top() {return Container::back();}
     inline void push(const T& v) {Container::push_back(v);}
     inline void push(T&& v) {Container::push_back(std::move(v));}
     template< class... Args >
     decltype(auto) emplace( Args&&... args ){return Container::emplace_back(std::forward<Args>(args)...);}
+    inline void pop() {Container::pop();}
+    void swap( stack& other ) noexcept {Container::swap(other);}
+    bool operator==(const stack& o) const {return static_cast<Container>(*this)==static_cast<Container>(o);}
+    bool operator!=(const stack& o) const {return static_cast<Container>(*this)!=static_cast<Container>(o);}
 };
 
 }

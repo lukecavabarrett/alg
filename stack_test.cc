@@ -1,3 +1,6 @@
+#include <deque>
+#include <list>
+#include <forward_list>
 #include "gtest/gtest.h"
 #include "stack.h"
 
@@ -29,6 +32,33 @@ TEST(Stack,Emplace){
     stk.emplace(s,s+strlen(s));
     EXPECT_EQ(stk.size(),3);
     EXPECT_EQ(stk.top().size(),strlen(s));
+}
+
+template<typename T,class C>
+void testStackTC(){
+    stack<T,C> stk;
+    stk.push(T());
+    stk.push(T());
+    T x;
+    stk.push(std::move(x));
+    stk.emplace();
+    EXPECT_EQ(stk.size(),4);
+    EXPECT_FALSE(stk.empty());
+    stack<T,C> stk2(stk);
+    EXPECT_FALSE(stk2.empty());
+    stk2.clear();
+    EXPECT_TRUE(stk2.empty());
+    stk2.swap(stk);
+    stk = stk2;
+    EXPECT_EQ(stk2,stk);
+}
+
+TEST(Stack,UnderlyingContainers){
+    testStackTC<int,alg::vector<int> >();
+    testStackTC<int,std::vector<int> >();
+    testStackTC<int,std::list <int> >();
+    //testStackTC<int,std::forward_list <int> >(); has no size!
+    testStackTC<int,std::deque<int> >();
 }
 
 }
