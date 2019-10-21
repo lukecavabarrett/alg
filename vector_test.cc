@@ -142,5 +142,17 @@ TEST(Vector,Deallocation){
     }
 }
 
+TEST(Vector,Comparison){
+    vector<float> a = {213.44,  24.111,31.09};
+    vector<float> b = {213.44,  24.111,31.09};
+    EXPECT_EQ(a,b);
+    b[1]++;
+    EXPECT_NE(a,b);
+    b[1]=a[1];
+    EXPECT_EQ(a,b);
+    b.pop_back();
+    EXPECT_NE(a,b);
+}
+
 }
 }

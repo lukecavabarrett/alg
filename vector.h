@@ -101,6 +101,9 @@ public:
 
     void swap(vector& o) noexcept;
 
+    bool operator==(const vector& o) const ;
+    bool operator!=(const vector& o) const ;
+
 };
 
 template<typename T, typename Allocator>
@@ -285,6 +288,20 @@ template<typename T, typename Allocator>
 void vector<T, Allocator>::clear() noexcept {
     std::destroy(_data,_data+_size);
     _size=0;
+}
+
+template<typename T, typename Allocator>
+bool vector<T, Allocator>::operator==(const vector &o) const {
+    if(_size != o._size)return false;
+    for(const T *a=_data,*b=o._data,*e=_data+_size;a!=e;++a,++b)if(*a!=*b)return false;
+    return true;
+}
+
+template<typename T, typename Allocator>
+bool vector<T, Allocator>::operator!=(const vector &o) const {
+    if(_size != o._size)return true;
+    for(const T *a=_data,*b=o._data,*e=_data+_size;a!=e;++a,++b)if(*a!=*b)return true;
+    return false;
 }
 
 
