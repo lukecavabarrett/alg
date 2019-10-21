@@ -99,6 +99,8 @@ public:
 
     void reserve(size_t new_cap) {return reserve_internal(new_cap);}
 
+    void swap(vector& o) noexcept;
+
 };
 
 template<typename T, typename Allocator>
@@ -111,6 +113,7 @@ vector<T, Allocator>::vector() : _size(0), _capacity(0), _data(nullptr) {
 
 template<typename T, typename Allocator>
 vector<T, Allocator>::~vector() {
+    std::destroy(_data,_data+_size);
     if (_data)_allocator.deallocate(_data, _capacity);
 }
 
@@ -198,6 +201,7 @@ void vector<T, Allocator>::reserve_internal(size_t nsize) {
     pointer ndata = _allocator.allocate(nsize);
     if (_capacity) {
         std::uninitialized_move(_data, _data + _size, ndata);
+        std::destroy(_data,_data+_size);
         _allocator.deallocate(_data, _capacity);
     }
     _data = ndata;
@@ -266,13 +270,21 @@ vector<T, Allocator> &vector<T, Allocator>::operator=(const vector &v) {
 
 template<typename T, typename Allocator>
 vector<T,Allocator> &vector<T, Allocator>::operator=(vector &&v) noexcept {
-    ~vector();
-    _data = v._data;
-    _size = v._size;
-    _capacity = v._capacity;
-    v._capacity = v._size = 0;
-    v._data = nullptr;
+    swap(v);
     return *this;
+}
+
+template<typename T, typename Allocator>
+void vector<T, Allocator>::swap(vector &o) noexcept {
+    std::swap(_data,o._data);
+    std::swap(_size,o._size);
+    std::swap(_capacity,o._capacity);
+}
+
+template<typename T, typename Allocator>
+void vector<T, Allocator>::clear() noexcept {
+    std::destroy(_data,_data+_size);
+    _size=0;
 }
 
 

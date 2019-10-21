@@ -1,3 +1,4 @@
+#include <unordered_set>
 #include "gtest/gtest.h"
 #include "vector.h"
 
@@ -92,5 +93,54 @@ TEST(Vector,Move){
     EXPECT_EQ(v.back().size(),strlen(s));
     EXPECT_EQ(a.size(),0);
 }
+
+class TestObject {
+    static int n_id;
+    static std::unordered_set<int> active_ids;
+    int id;
+public:
+    TestObject() : id(n_id++) {
+        EXPECT_TRUE(active_ids.insert(id).second);
+    };
+    TestObject(const TestObject& t) : id(n_id++) {
+        EXPECT_TRUE(active_ids.insert(id).second);
+    };
+    TestObject(TestObject&& t) : id(n_id++) {
+        EXPECT_TRUE(active_ids.insert(id).second);
+    };
+    ~TestObject() {
+        EXPECT_EQ(active_ids.erase(id),1);
+    }
+    static int AllocatedObjects(){
+        return active_ids.size();
+    }
+
+};
+
+int TestObject::n_id = 0;
+std::unordered_set<int> TestObject::active_ids;
+
+TEST(Vector,Deallocation){
+    {
+        vector<TestObject> v;
+        EXPECT_EQ(TestObject::AllocatedObjects(),0);
+        for (int i = 0; i < 100; i++){
+            v.emplace_back();
+            EXPECT_EQ(TestObject::AllocatedObjects(),v.size());
+        }
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(),0);
+    {
+        vector<TestObject> v;
+        EXPECT_EQ(TestObject::AllocatedObjects(),0);
+        for (int i = 0; i < 100; i++){
+            v.emplace_back();
+            EXPECT_EQ(TestObject::AllocatedObjects(),v.size());
+        }
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(),0);
+    }
+}
+
 }
 }
