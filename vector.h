@@ -22,6 +22,9 @@ private:
     static allocator_type _allocator;
     size_t _size, _capacity;
     T *_data;
+    // Invariants:
+    // [_data,_data+_size) is initialized memory;
+    // [_data+_size,_data+_capacity) is uninitialized memory;
 
     void reserve_internal(size_t nsize);
 
@@ -37,7 +40,9 @@ public:
 
     ~vector();
 
-    explicit vector(size_t size, const T &x = T());
+    explicit vector(size_t size);
+
+    vector(size_t size, const T &x);
 
     vector(const vector &v);
 
@@ -76,13 +81,13 @@ public:
 
     const_iterator cend() const;
 
-    size_type size() const { return _size; }
+    [[nodiscard]] size_type size() const { return _size; }
 
-    size_type capacity() const { return _capacity; }
+    [[nodiscard]] size_type capacity() const { return _capacity; }
 
-    size_type max_size() const { return std::numeric_limits<size_type>::max(); }
+    [[nodiscard]] size_type max_size() const { return std::numeric_limits<size_type>::max(); }
 
-    bool empty() const { return _size == 0; }
+    [[nodiscard]] bool empty() const { return _size == 0; }
 
     void shrink_to_fit();
 
@@ -97,12 +102,13 @@ public:
 
     void clear() noexcept;
 
-    void reserve(size_t new_cap) {return reserve_internal(new_cap);}
+    void reserve(size_t new_cap) { return reserve_internal(new_cap); }
 
-    void swap(vector& o) noexcept;
+    void swap(vector &o) noexcept;
 
-    bool operator==(const vector& o) const ;
-    bool operator!=(const vector& o) const ;
+    bool operator==(const vector &o) const;
+
+    bool operator!=(const vector &o) const;
 
 };
 
@@ -116,20 +122,26 @@ vector<T, Allocator>::vector() : _size(0), _capacity(0), _data(nullptr) {
 
 template<typename T, typename Allocator>
 vector<T, Allocator>::~vector() {
-    std::destroy(_data,_data+_size);
+    std::destroy(_data, _data + _size);
     if (_data)_allocator.deallocate(_data, _capacity);
+}
+
+template<typename T, typename Allocator>
+vector<T, Allocator>::vector(size_t size) : _size(size), _capacity(size),
+                                            _data(_allocator.allocate(size)) {
+    std::uninitialized_value_construct_n(_data, _size);
 }
 
 template<typename T, typename Allocator>
 vector<T, Allocator>::vector(size_t size, const T &x) : _size(size), _capacity(size),
                                                         _data(_allocator.allocate(size)) {
-    std::fill(_data, _data + size, x);
+    std::uninitialized_fill_n(_data, _size, x);
 }
 
 template<typename T, typename Allocator>
 vector<T, Allocator>::vector(const vector &v) : _size(v._size), _capacity(v._size),
                                                 _data(_allocator.allocate(v._size)) {
-    std::copy(v._data, v._data + v._size, _data);
+    std::uninitialized_copy_n(v._data,_size,_data);
 }
 
 template<typename T, typename Allocator>
@@ -204,7 +216,7 @@ void vector<T, Allocator>::reserve_internal(size_t nsize) {
     pointer ndata = _allocator.allocate(nsize);
     if (_capacity) {
         std::uninitialized_move(_data, _data + _size, ndata);
-        std::destroy(_data,_data+_size);
+        std::destroy(_data, _data + _size);
         _allocator.deallocate(_data, _capacity);
     }
     _data = ndata;
@@ -214,14 +226,14 @@ void vector<T, Allocator>::reserve_internal(size_t nsize) {
 template<typename T, typename Allocator>
 vector<T, Allocator>::vector(std::initializer_list<T> init) : _size(init.size()), _capacity(init.size()),
                                                               _data(_allocator.allocate(init.size())) {
-    std::copy(init.begin(), init.end(), _data);
+    std::uninitialized_copy_n(init.begin(),_size, _data);
 }
 
 template<typename T, typename Allocator>
 template<typename InputIt>
 vector<T, Allocator>::vector(InputIt first, InputIt last) : _size(std::distance(first, last)), _capacity(_size),
                                                             _data(_allocator.allocate(_size)) {
-    std::copy(first, last, _data);
+    std::uninitialized_copy(first, last, _data);
 }
 
 template<typename T, typename Allocator>
@@ -229,7 +241,8 @@ void vector<T, Allocator>::shrink_to_fit() {
     if (_capacity == _size)return;
     if (_size) {
         pointer ndata = _allocator.allocate(_size);
-        std::uninitialized_move(_data, _data + _size, ndata);
+        std::uninitialized_move_n(_data, _size, ndata);
+        std::destroy_n(_data,_size);
     }
     _allocator.deallocate(_data, _capacity);
     _capacity = _size;
@@ -239,14 +252,14 @@ void vector<T, Allocator>::shrink_to_fit() {
 template<typename T, typename Allocator>
 void vector<T, Allocator>::push_back(const T &value) {
     reserve_for_insertion();
-    _allocator.construct(_data + _size,value);
+    _allocator.construct(_data + _size, value);
     ++_size;
 }
 
 template<typename T, typename Allocator>
 void vector<T, Allocator>::push_back(T &&value) {
     reserve_for_insertion();
-    _allocator.construct(_data + _size,std::move(value));
+    _allocator.construct(_data + _size, std::move(value));
     ++_size;
 }
 
@@ -254,53 +267,55 @@ template<typename T, typename Allocator>
 template<class... Args>
 typename vector<T, Allocator>::reference vector<T, Allocator>::emplace_back(Args &&... args) {
     reserve_for_insertion();
-    _allocator.construct(_data+_size,std::forward<Args>(args)...);
+    _allocator.construct(_data + _size, std::forward<Args>(args)...);
     return _data[_size++];
 }
 
 template<typename T, typename Allocator>
 void vector<T, Allocator>::pop_back() {
     --_size;
+    std::destroy_at(_data+_size);
 }
 
 template<typename T, typename Allocator>
 vector<T, Allocator> &vector<T, Allocator>::operator=(const vector &v) {
+    clear();
     reserve_internal(v._size);
+    std::uninitialized_copy_n(v._data,v._size,_data);
     _size = v._size;
-    std::copy(v._data, v._data + _size, v._data);
     return *this;
 }
 
 template<typename T, typename Allocator>
-vector<T,Allocator> &vector<T, Allocator>::operator=(vector &&v) noexcept {
+vector<T, Allocator> &vector<T, Allocator>::operator=(vector &&v) noexcept {
     swap(v);
     return *this;
 }
 
 template<typename T, typename Allocator>
 void vector<T, Allocator>::swap(vector &o) noexcept {
-    std::swap(_data,o._data);
-    std::swap(_size,o._size);
-    std::swap(_capacity,o._capacity);
+    std::swap(_data, o._data);
+    std::swap(_size, o._size);
+    std::swap(_capacity, o._capacity);
 }
 
 template<typename T, typename Allocator>
 void vector<T, Allocator>::clear() noexcept {
-    std::destroy(_data,_data+_size);
-    _size=0;
+    std::destroy_n(_data,_size);
+    _size = 0;
 }
 
 template<typename T, typename Allocator>
 bool vector<T, Allocator>::operator==(const vector &o) const {
-    if(_size != o._size)return false;
-    for(const T *a=_data,*b=o._data,*e=_data+_size;a!=e;++a,++b)if(*a!=*b)return false;
+    if (_size != o._size)return false;
+    for (const T *a = _data, *b = o._data, *e = _data + _size; a != e; ++a, ++b)if (*a != *b)return false;
     return true;
 }
 
 template<typename T, typename Allocator>
 bool vector<T, Allocator>::operator!=(const vector &o) const {
-    if(_size != o._size)return true;
-    for(const T *a=_data,*b=o._data,*e=_data+_size;a!=e;++a,++b)if(*a!=*b)return true;
+    if (_size != o._size)return true;
+    for (const T *a = _data, *b = o._data, *e = _data + _size; a != e; ++a, ++b)if (*a != *b)return true;
     return false;
 }
 

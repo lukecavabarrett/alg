@@ -30,6 +30,22 @@ cc_test(
 )
 
 cc_library(
+    name = "priority_queue",
+    hdrs = ["priority_queue.h"],
+    visibility = ["//visibility:public"],
+    deps = [":vector"],
+)
+
+cc_test(
+    name = "priority_queue_test",
+    srcs = ["priority_queue_test.cc"],
+    deps = [
+        ":priority_queue",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "binary_node",
     hdrs = ["binary_node.h"],
     visibility = ["//visibility:public"],

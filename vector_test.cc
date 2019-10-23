@@ -73,25 +73,25 @@ TEST(Vector, Allocation) {
     std::cout << v.size() << "/" << v.capacity() << std::endl;
 }
 
-TEST(Vector,Move){
+TEST(Vector, Move) {
     vector<std::string> v;
     constexpr char s[] = "Hello, World!";
-    std::string a(s,s+strlen(s));
+    std::string a(s, s + strlen(s));
 
     v.push_back(a);
-    EXPECT_EQ(v.back().size(),strlen(s));
-    EXPECT_EQ(a.size(),strlen(s));
-    EXPECT_EQ(v.size(),1);
-    EXPECT_GE(v.capacity(),1);
-    EXPECT_EQ(v.back(),a);
+    EXPECT_EQ(v.back().size(), strlen(s));
+    EXPECT_EQ(a.size(), strlen(s));
+    EXPECT_EQ(v.size(), 1);
+    EXPECT_GE(v.capacity(), 1);
+    EXPECT_EQ(v.back(), a);
 
     v.push_back(a);
-    EXPECT_EQ(v.back().size(),strlen(s));
-    EXPECT_EQ(a.size(),strlen(s));
+    EXPECT_EQ(v.back().size(), strlen(s));
+    EXPECT_EQ(a.size(), strlen(s));
 
     v.push_back(std::move(a));
-    EXPECT_EQ(v.back().size(),strlen(s));
-    EXPECT_EQ(a.size(),0);
+    EXPECT_EQ(v.back().size(), strlen(s));
+    EXPECT_EQ(a.size(), 0);
 }
 
 class TestObject {
@@ -102,56 +102,156 @@ public:
     TestObject() : id(n_id++) {
         EXPECT_TRUE(active_ids.insert(id).second);
     };
-    TestObject(const TestObject& t) : id(n_id++) {
+
+    TestObject(const TestObject &t) : id(n_id++) {
         EXPECT_TRUE(active_ids.insert(id).second);
     };
-    TestObject(TestObject&& t) : id(n_id++) {
+
+    TestObject(TestObject &&t) : id(n_id++) {
         EXPECT_TRUE(active_ids.insert(id).second);
     };
+
     ~TestObject() {
-        EXPECT_EQ(active_ids.erase(id),1);
-    }
-    static int AllocatedObjects(){
-        return active_ids.size();
+        EXPECT_EQ(active_ids.erase(id), 1);
     }
 
+    TestObject& operator=(const TestObject& o){return *this;}
+    TestObject& operator=(TestObject&& o){return *this;}
+
+    static int AllocatedObjects() {
+        return active_ids.size();
+    }
 };
 
 int TestObject::n_id = 0;
 std::unordered_set<int> TestObject::active_ids;
 
-TEST(Vector,Deallocation){
+TEST(Vector, AllocationAndDestruction) {
     {
         vector<TestObject> v;
-        EXPECT_EQ(TestObject::AllocatedObjects(),0);
-        for (int i = 0; i < 100; i++){
+        EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+        for (int i = 0; i < 100; i++) {
             v.emplace_back();
-            EXPECT_EQ(TestObject::AllocatedObjects(),v.size());
+            EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
         }
-    }
-    EXPECT_EQ(TestObject::AllocatedObjects(),0);
-    {
-        vector<TestObject> v;
-        EXPECT_EQ(TestObject::AllocatedObjects(),0);
-        for (int i = 0; i < 100; i++){
-            v.emplace_back();
-            EXPECT_EQ(TestObject::AllocatedObjects(),v.size());
+        for (int i = 0; i < 50; i++) {
+            v.pop_back();
+            EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
         }
-        v.clear();
-        EXPECT_EQ(TestObject::AllocatedObjects(),0);
+        // ~vector();
     }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
 }
 
-TEST(Vector,Comparison){
-    vector<float> a = {213.44,  24.111,31.09};
-    vector<float> b = {213.44,  24.111,31.09};
-    EXPECT_EQ(a,b);
+TEST(Vector, AllocationAndClear) {
+    {
+        vector<TestObject> v;
+        EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+        for (int i = 0; i < 100; i++) {
+            v.push_back(TestObject());
+            EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
+        }
+        for (int i = 0; i < 50; i++) {
+            v.pop_back();
+            EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
+        }
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, DefaultInitializationAndDestroy) {
+    {
+        vector<TestObject> v(100);
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, CopyInitializationAndClear) {
+    {
+        TestObject to;
+        vector<TestObject> v(100, to);
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size() + 1);
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), 1);
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, CopyConstructorAndClearAndDestroy) {
+
+    vector<TestObject> v;
+    for (int i = 0; i < 100; i++) {
+        v.push_back(TestObject());
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
+    }
+    {
+        vector<TestObject> vc(v);
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size() + vc.size());
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), vc.size());
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, MoveConstructorAndClearAndDestroy) {
+    vector<TestObject> v;
+    for (int i = 0; i < 100; i++) {
+        v.push_back(TestObject());
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size());
+    }
+    {
+        vector<TestObject> vm(std::move(v));
+        EXPECT_EQ(v.size(),0);
+        EXPECT_EQ(TestObject::AllocatedObjects(), vm.size());
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), vm.size());
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, AssignFromBigger) {
+    vector<TestObject> v(100);
+    {
+        vector<TestObject> va(30);
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size() + va.size());
+        va = v;
+
+        EXPECT_EQ(TestObject::AllocatedObjects(), 2*v.size());
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), va.size());
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, AssignFromSmaller) {
+    vector<TestObject> v(30);
+    {
+        vector<TestObject> va(100);
+        EXPECT_EQ(TestObject::AllocatedObjects(), v.size() + va.size());
+        va = v;
+
+        EXPECT_EQ(TestObject::AllocatedObjects(), 2*v.size());
+        v.clear();
+        EXPECT_EQ(TestObject::AllocatedObjects(), va.size());
+    }
+    EXPECT_EQ(TestObject::AllocatedObjects(), 0);
+}
+
+TEST(Vector, Comparison) {
+    vector<float> a = {213.44, 24.111, 31.09};
+    vector<float> b = {213.44, 24.111, 31.09};
+    EXPECT_EQ(a, b);
     b[1]++;
-    EXPECT_NE(a,b);
-    b[1]=a[1];
-    EXPECT_EQ(a,b);
+    EXPECT_NE(a, b);
+    b[1] = a[1];
+    EXPECT_EQ(a, b);
     b.pop_back();
-    EXPECT_NE(a,b);
+    EXPECT_NE(a, b);
 }
 
 }
