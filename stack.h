@@ -21,7 +21,7 @@ public:
     inline void push(T&& v) {Container::push_back(std::move(v));}
     template< class... Args >
     decltype(auto) emplace( Args&&... args ){return Container::emplace_back(std::forward<Args>(args)...);}
-    inline void pop() {Container::pop();}
+    inline void pop() {Container::pop_back();}
     void swap( stack& other ) noexcept {Container::swap(other);}
     bool operator==(const stack& o) const {return static_cast<Container>(*this)==static_cast<Container>(o);}
     bool operator!=(const stack& o) const {return static_cast<Container>(*this)!=static_cast<Container>(o);}
