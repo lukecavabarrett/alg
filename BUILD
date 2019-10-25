@@ -46,6 +46,22 @@ cc_test(
 )
 
 cc_library(
+    name = "priority_suffix",
+    hdrs = ["priority_suffix.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "priority_suffix_test",
+    srcs = ["priority_suffix_test.cc"],
+    deps = [
+        ":priority_suffix",
+        ":vector",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "binary_node",
     hdrs = ["binary_node.h"],
     visibility = ["//visibility:public"],
