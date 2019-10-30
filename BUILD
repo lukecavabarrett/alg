@@ -62,6 +62,22 @@ cc_test(
 )
 
 cc_library(
+    name = "max_queue",
+    hdrs = ["max_queue.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "max_queue_test",
+    srcs = ["max_queue_test.cc"],
+    deps = [
+        ":max_queue",
+        ":vector",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "binary_node",
     hdrs = ["binary_node.h"],
     visibility = ["//visibility:public"],
