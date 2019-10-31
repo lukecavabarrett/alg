@@ -19,6 +19,17 @@ class priority_suffix : private std::multimap<Key,const T, CompareKey, Allocator
 
 public:
 
+    typedef std::pair<const Key,const T> value_type;
+    using  parent::allocator_type;
+    using  parent::size_type;
+    using  parent::difference_type;
+    using  parent::reference;
+    using  parent::const_reference;
+    using  parent::pointer;
+    using  parent::const_pointer;
+    using  parent::iterator;
+    using  parent::const_iterator;
+
     //ctors
     priority_suffix() : parent(), c() {}
     explicit priority_suffix(const CompareKey& comp) : parent(comp), c() {}
