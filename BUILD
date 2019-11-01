@@ -62,6 +62,21 @@ cc_test(
 )
 
 cc_library(
+    name = "fibonacci_heap",
+    hdrs = ["fibonacci_heap.h"],
+    visibility = ["//visibility:public"],
+)
+
+cc_test(
+    name = "fibonacci_heap_test",
+    srcs = ["fibonacci_heap_test.cc"],
+    deps = [
+        ":fibonacci_heap",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_library(
     name = "max_queue",
     hdrs = ["max_queue.h"],
     visibility = ["//visibility:public"],
