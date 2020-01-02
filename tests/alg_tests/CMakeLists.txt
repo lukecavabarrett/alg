@@ -21,5 +21,6 @@ add_testing_unit(priority_suffix_test)
 add_testing_unit(rolling_hash_test)
 add_testing_unit(stack_test)
 add_testing_unit(tree_algs_test)
+add_testing_unit(tree_list_test)
 add_testing_unit(vector_test)
 

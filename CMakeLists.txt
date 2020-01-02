@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 project(alg)
 
+set(CMAKE_CXX_STANDARD 17)
 add_definitions(-std=c++17)
 
 #set(SOURCE_FILES main.cpp)
