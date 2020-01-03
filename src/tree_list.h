@@ -23,7 +23,8 @@ namespace __gnu_pbds {
                 typename Cmp_Fn,
                 typename Node_And_It_Traits,
                 typename _Alloc>
-    class rb_tree_list : public bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> {
+        class rb_tree_list
+                : public bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> {
         private:
             typedef bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> base_type;
             typedef typename base_type::node_pointer node_pointer;
@@ -137,7 +138,8 @@ namespace __gnu_pbds {
 
             inline size_type
             black_height(node_pointer);
-    public:
+
+        public:
             void
             split_at_node(node_pointer, rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
 
@@ -215,12 +217,14 @@ namespace __gnu_pbds {
         rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
         __base_type__insert_leaf_at(const_reference r_value, node_pointer x) {
             if (base_type::m_size == 0) return base_type::insert_imp_empty(r_value);
-            if (x == base_type::m_p_head) return base_type::insert_leaf_new(r_value, base_type::m_p_head->m_p_right, false);
+            if (x == base_type::m_p_head)
+                return base_type::insert_leaf_new(r_value, base_type::m_p_head->m_p_right, false);
             if (x->m_p_left == nullptr)return base_type::insert_leaf_new(r_value, x, true);
             x = x->m_p_left;
-            while(x->m_p_right != nullptr)x = x->m_p_right;
+            while (x->m_p_right != nullptr)x = x->m_p_right;
             return base_type::insert_leaf_new(r_value, x, false);
         }
+
         /*
         template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
         inline std::pair<typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator, bool>
@@ -716,6 +720,28 @@ namespace __gnu_pbds {
     }
 }
 
+namespace alg {
+    template<class T>
+    constexpr
+    std::string_view
+    type_name() {
+        using namespace std;
+#ifdef __clang__
+        string_view p = __PRETTY_FUNCTION__;
+    return string_view(p.data() + 34, p.size() - 34 - 1);
+#elif defined(__GNUC__)
+        string_view p = __PRETTY_FUNCTION__;
+#  if __cplusplus < 201402
+        return string_view(p.data() + 36, p.size() - 36 - 1);
+#  else
+        return string_view(p.data() + 49, p.find(';', 49) - 49);
+#  endif
+#elif defined(_MSC_VER)
+        string_view p = __FUNCSIG__;
+    return string_view(p.data() + 84, p.size() - 84 - 7);
+#endif
+    }
+}
 
 namespace alg {
 
@@ -724,8 +750,76 @@ namespace alg {
             typename Cmp_Fn_, typename _Alloc_>
             class Node_Update = __gnu_pbds::null_node_update, typename _Alloc = std::allocator<char> >
     using tree_list = __gnu_pbds::detail::rb_tree_list<Key,
-    __gnu_pbds::null_type, detail::null_comparer<Key>, __gnu_pbds::detail::tree_traits<Key, __gnu_pbds::null_type, detail::null_comparer<Key>, Node_Update, __gnu_pbds::rb_tree_tag, _Alloc >, _Alloc>;
+            __gnu_pbds::null_type, detail::null_comparer<Key>, __gnu_pbds::detail::tree_traits<Key, __gnu_pbds::null_type, detail::null_comparer<Key>, Node_Update, __gnu_pbds::rb_tree_tag, _Alloc>, _Alloc>;
     //__gnu_pbds::detail::rb_tree_set<int, __gnu_pbds::null_type, std::less<int>, __gnu_pbds::detail::tree_traits<int, __gnu_pbds::null_type, std::less<int>, __gnu_pbds::tree_order_statistics_node_update, __gnu_pbds::rb_tree_tag, std::allocator<char> >, std::allocator<char> >
+}
+
+#include <iostream>
+
+namespace alg {
+    namespace detail {
+        template<typename T>
+        struct max_prefix_metadata {
+            T sum, max_prefix;
+        };
+    }
+
+        template<typename Node_CItr, typename Node_Itr, typename Cmp_Fn, typename _Alloc>
+    class max_prefix_policy : private __gnu_pbds::detail::branch_policy<Node_CItr, Node_Itr, _Alloc> {
+    private:
+        typedef __gnu_pbds::detail::branch_policy<Node_CItr, Node_Itr, _Alloc> base_type;
+        public:
+
+            typedef typename base_type::key_type key_type;
+            typedef typename base_type::key_const_reference key_const_reference;
+
+            typedef Node_CItr node_const_iterator;
+            typedef Node_Itr node_iterator;
+            typedef typename node_iterator::value_type iterator;
+            typedef typename std::remove_pointer_t<iterator> value_type;
+            typedef detail::max_prefix_metadata<key_type> metadata_type;
+            typedef metadata_type &metadata_reference;
+
+            void operator()(Node_Itr nd_it, Node_CItr end_nd_it) {
+                node_iterator l_it = nd_it.get_l_child();
+                node_iterator r_it = nd_it.get_r_child();
+                const metadata_type l_m = (l_it == end_nd_it) ? metadata_type{0, 0} : l_it.get_metadata();
+                const metadata_type r_m = (r_it == end_nd_it) ? metadata_type{0, 0} : r_it.get_metadata();
+                const_cast<metadata_reference >(nd_it.get_metadata()) = metadata_type{.sum = l_m.sum + **nd_it +
+                                                                                             r_m.sum, .max_prefix = std::max(
+                        l_m.max_prefix, l_m.sum + **nd_it + r_m.max_prefix)};
+            }
+
+            key_type get_max_prefix() {
+                Node_CItr it = node_begin();
+                return it.get_metadata().max_prefix;
+            }
+
+            virtual Node_CItr
+            node_begin() const = 0;
+
+            virtual Node_CItr
+            node_end() const = 0;
+        };
+
+}
+
+namespace alg {
+    template<typename Node_CItr, typename Node_Itr,
+            typename Cmp_Fn, typename _Alloc>
+    class random_access_policy
+            : public __gnu_pbds::tree_order_statistics_node_update<Node_CItr, Node_Itr, Cmp_Fn, _Alloc> {
+
+    private:
+        typedef __gnu_pbds::tree_order_statistics_node_update<Node_CItr, Node_Itr, Cmp_Fn, _Alloc> base_type;
+    public:
+
+        typename base_type::key_const_reference operator[](typename base_type::size_type idx) const {
+            return *base_type::find_by_order(idx);
+        }
+
+    };
+
 }
 
 #endif //TREES_TREE_LIST_H
