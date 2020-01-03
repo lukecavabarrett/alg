@@ -1,43 +1,42 @@
 #ifndef TREES_TREE_LIST_H
 #define TREES_TREE_LIST_H
 
-namespace alg {
-    namespace detail {
-        template<class T = void>
-        struct null_comparer {
-            typedef bool result_type;
-            typedef T first_argument_type;
-            typedef T second_argument_type;
-            // constexpr bool operator()(const T &lhs, const T &rhs) const {}
-        };
-    }
+namespace alg::detail {
+    template<class T = void>
+    struct null_comparer {
+        typedef bool result_type;
+        typedef T first_argument_type;
+        typedef T second_argument_type;
+        // constexpr bool operator()(const T &lhs, const T &rhs) const {}
+    };
 }
 
 #include <ext/pb_ds/assoc_container.hpp>
 
 
-namespace __gnu_pbds {
-    namespace detail {
-        template<typename Key,
-                typename Mapped,
-                typename Cmp_Fn,
-                typename Node_And_It_Traits,
-                typename _Alloc>
-        class rb_tree_list
-                : public bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> {
-        private:
-            typedef bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> base_type;
-            typedef typename base_type::node_pointer node_pointer;
+namespace __gnu_pbds::detail {
+    template<typename Key,
+            typename Mapped,
+            typename Cmp_Fn,
+            typename Node_And_It_Traits,
+            typename _Alloc>
+    class rb_tree_list
+            : public bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> {
+    private:
+        typedef bin_search_tree_set<Key, __gnu_pbds::null_type, alg::detail::null_comparer<Key>, Node_And_It_Traits, _Alloc> base_type;
+        typedef typename base_type::node_pointer node_pointer;
+        typedef typename base_type::node node;
+        typedef typename base_type::node_allocator node_allocator;
+    public:
 
-        public:
-            typedef rb_tree_tag container_category;
-            typedef Cmp_Fn cmp_fn;
-            typedef _Alloc allocator_type;
-            typedef typename _Alloc::size_type size_type;
-            typedef typename _Alloc::difference_type difference_type;
-            typedef typename base_type::key_type key_type;
-            typedef typename base_type::key_pointer key_pointer;
-            typedef typename base_type::key_const_pointer key_const_pointer;
+        typedef rb_tree_tag container_category;
+        typedef Cmp_Fn cmp_fn;
+        typedef _Alloc allocator_type;
+        typedef typename _Alloc::size_type size_type;
+        typedef typename _Alloc::difference_type difference_type;
+        typedef typename base_type::key_type key_type;
+        typedef typename base_type::key_pointer key_pointer;
+        typedef typename base_type::key_const_pointer key_const_pointer;
             typedef typename base_type::key_reference key_reference;
             typedef typename base_type::key_const_reference key_const_reference;
             typedef typename base_type::mapped_type mapped_type;
@@ -48,60 +47,193 @@ namespace __gnu_pbds {
             typedef typename base_type::value_type value_type;
             typedef typename base_type::pointer pointer;
             typedef typename base_type::const_pointer const_pointer;
-            typedef typename base_type::reference reference;
-            typedef typename base_type::const_reference const_reference;
-            typedef typename base_type::point_iterator point_iterator;
-            typedef typename base_type::const_iterator point_const_iterator;
-            typedef typename base_type::iterator iterator;
-            typedef typename base_type::const_iterator const_iterator;
-            typedef typename base_type::reverse_iterator reverse_iterator;
-            typedef typename base_type::const_reverse_iterator const_reverse_iterator;
-            typedef typename base_type::node_update node_update;
+        typedef typename base_type::reference reference;
+        typedef typename base_type::const_reference const_reference;
+        typedef typename base_type::point_iterator point_iterator;
+        typedef typename base_type::const_iterator point_const_iterator;
+        typedef typename base_type::iterator iterator;
+        typedef typename base_type::const_iterator const_iterator;
+        typedef typename base_type::reverse_iterator reverse_iterator;
+        typedef typename base_type::const_reverse_iterator const_reverse_iterator;
+        typedef typename base_type::node_update node_update;
 
-            typedef node_pointer public_node_pointer;
+        class node_type {
+        private:
+            friend class rb_tree_list;
 
-            rb_tree_list();
+            //constructor
+            node_type(node_pointer p, const node_allocator &a) : m_ptr(p), n_all(a) {}
 
-            rb_tree_list(const Cmp_Fn &);
+        public:
+            node_type() : m_ptr(nullptr) {}
 
-            rb_tree_list(const Cmp_Fn &, const node_update &);
+            node_type(node_type &&o) noexcept : m_ptr(o.m_ptr), n_all(o.n_all) { o.m_ptr = nullptr; }
 
-            rb_tree_list(const rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+            void swap(node_type &o) {
+                std::swap(m_ptr, o.m_ptr);
+                std::swap(n_all, o.n_all);
+            }
 
-            void
-            swap(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+            node_type &operator=(node_type &&o) noexcept {
+                swap(o);
+                return *this;
+            } //&& or &?
+            key_reference key() { return m_ptr->m_p_value; }
 
-            template<typename It>
-            void
-            copy_from_range(It, It);
+            [[nodiscard]] bool empty() const { return m_ptr == nullptr; }
 
-            //inline std::pair<point_iterator, bool>            insert(const_reference);
+            explicit operator bool() const { return m_ptr != nullptr; }
 
-            inline point_iterator
-            __base_type__insert_leaf_at(const_reference, node_pointer);
+            //destructor
+            ~node_type() {
+                if (m_ptr) {
+                    m_ptr->~node();
+                    n_all.deallocate(m_ptr, 1);
+                }
+            }
 
-            point_iterator
-            insert_at(point_iterator, const_reference);
+        private:
+            node_pointer m_ptr;
+            node_allocator n_all;
+        };
 
-            inline iterator
-            erase(iterator);
+    private:
+        // node creation
+        inline node_pointer __make_node_copy_constructor(const_reference);
 
-            inline reverse_iterator
-            erase(reverse_iterator);
+        inline node_pointer __make_node_move_constructor(key_type &&);
 
-            template<typename Pred>
-            inline size_type
-            erase_if(Pred);
+        template<class... Args>
+        inline node_pointer __make_node_custom_constructor(Args &&... args);
 
-            void
-            join(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+        inline node_pointer __make_node_node_handler(node_type &&nh);
 
-            void
+        // base_type node insertion
+        inline void __base_type__insert_imp_empty(node_pointer);
+
+        inline void __base_type__insert_leaf(node_pointer, node_pointer, bool);
+
+        inline void __base_type__insert_leaf_at(node_pointer, node_pointer);
+
+        // node insertion
+        inline point_iterator __insert(node_pointer, node_pointer);
+
+        inline point_iterator __insert_back(node_pointer);
+
+        inline point_iterator __insert_front(node_pointer);
+
+        // node erasion
+        inline void __erase_destroy(node_pointer);
+
+        inline void __erase_destroy_front();
+
+        inline void __erase_destroy_back();
+
+        inline node_pointer __erase_get_ptr(node_pointer);
+
+        inline node_pointer __erase_get_ptr_front();
+
+        inline node_pointer __erase_get_ptr_back();
+
+        inline point_iterator __erase_destroy_get_next(point_iterator);
+
+        inline point_iterator __erase_destroy_get_prev(point_iterator);
+
+    public:
+
+        //constructors
+
+        rb_tree_list();
+
+        //rb_tree_list(const Cmp_Fn &);
+
+        //rb_tree_list(const Cmp_Fn &, const node_update &);
+
+        rb_tree_list(const rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+
+        void
+        swap(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+
+        template<typename It>
+        void
+        copy_from_range(It, It);
+
+        //inline std::pair<point_iterator, bool>            insert(const_reference);
+
+
+        //insertors
+
+        iterator insert(iterator it, const_reference cr) {
+            return __insert(__make_node_copy_constructor(cr), it.m_p_nd);
+        }
+
+        iterator push_front(const_reference cr) { return __insert_front(__make_node_copy_constructor(cr)); }
+
+        iterator push_back(const_reference cr) { return __insert_back(__make_node_copy_constructor(cr)); }
+
+        iterator insert(iterator it, key_type &&rr) {
+            return __insert(__make_node_move_constructor(std::move(rr)), it.m_p_nd);
+        }
+
+        iterator push_front(key_type &&rr) { return __insert_front(__make_node_move_constructor(std::move(rr))); }
+
+        iterator push_back(key_type &&rr) { return __insert_back(__make_node_move_constructor(std::move(rr))); }
+
+        iterator insert(iterator it, node_type &&nh) {
+            return __insert(__make_node_node_handler(std::move(nh)), it.m_p_nd);
+        }
+
+        iterator push_front(node_type &&nh) { return __insert_front(__make_node_node_handler(std::move(nh))); }
+
+        iterator push_back(node_type &&nh) { return __insert_back(__make_node_node_handler(std::move(nh))); }
+
+        template<class... Args>
+        iterator emplace(iterator it, Args &&... args) {
+            return __insert(__make_node_custom_constructor(std::forward<Args>(args)...), it.m_p_nd);
+        }
+
+        template<class... Args>
+        iterator emplace_front(Args &&... args) {
+            return __insert_front(__make_node_custom_constructor(std::forward<Args>(args)...));
+        }
+
+        template<class... Args>
+        iterator emplace_back(Args &&... args) {
+            return __insert_back(__make_node_custom_constructor(std::forward<Args>(args)...));
+        }
+
+        //erasers
+
+        iterator erase(iterator it) override { return __erase_destroy_get_next(it); }
+
+        reverse_iterator erase(reverse_iterator it) override { return __erase_destroy_get_prev(it); }
+
+        void pop_back() { __erase_destroy_front(); }
+
+        void pop_front() { __erase_destroy_back(); }
+
+        node_type extract(iterator it) {
+            return node_type(__erase_get_ptr(it.m_p_nd), base_type::s_node_allocator);
+        }
+
+        node_type extract_front() { return node_type(__erase_get_ptr_front(), base_type::s_node_allocator); }
+
+        node_type extract_back() { return node_type(__erase_get_ptr_back(), base_type::s_node_allocator); }
+
+
+        template<typename Pred>
+        inline size_type
+        erase_if(Pred);
+
+        void
+        join(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+
+        void
             split(key_const_reference, rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
 
         private:
-            inline static bool
-            is_effectively_black(const node_pointer);
+        inline static bool
+        is_effectively_black(node_pointer);
 
             void
             initialize();
@@ -201,55 +333,151 @@ namespace __gnu_pbds {
         rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
         initialize() { base_type::m_p_head->m_red = true; }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        insert_at(point_iterator it, const_reference r_value) {
 
-            point_iterator itn = __base_type__insert_leaf_at(r_value, it.m_p_nd);
-            itn.m_p_nd->m_red = true;
-            insert_fixup(itn.m_p_nd);
-            return itn;
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __base_type__insert_leaf_at(node_pointer p_new_nd, node_pointer p_nd) {
+        if (base_type::m_size == 0) {
+            __base_type__insert_imp_empty(p_new_nd);
+        } else if (p_nd == base_type::m_p_head) {
+            __base_type__insert_leaf(p_new_nd, base_type::m_p_head->m_p_right, false);
+        } else if (p_nd->m_p_left == nullptr) {
+            __base_type__insert_leaf(p_new_nd, p_nd, true);
+        } else {
+            p_nd = p_nd->m_p_left;
+            while (p_nd->m_p_right != nullptr)p_nd = p_nd->m_p_right;
+            __base_type__insert_leaf(p_new_nd, p_nd, false);
+        }
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_copy_constructor(const_reference r_val) {
+        node_pointer p_new_nd = base_type::s_node_allocator.allocate(1);
+
+        new(const_cast<void * >(static_cast<const void * >(&p_new_nd->m_value)))
+                typename base_type::node::value_type(r_val);
+
+        p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_move_constructor(key_type &&rr_val) {
+        node_pointer p_new_nd = base_type::s_node_allocator.allocate(1);
+
+        new(const_cast<void * >(static_cast<const void * >(&p_new_nd->m_value)))
+                typename base_type::node::value_type(rr_val);
+
+        p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    template<class... Args>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_custom_constructor(Args &&... args) {
+        node_pointer p_new_nd = base_type::s_node_allocator.allocate(1);
+
+        new(const_cast<void * >(static_cast<const void * >(&p_new_nd->m_value)))
+                typename base_type::node::value_type(std::forward<Args>(args)...);
+
+        p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_node_handler(node_type &&nh) {
+        node_pointer p_new_nd = nh.m_ptr;
+        nh.m_ptr = nullptr;
+
+        p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __base_type__insert_imp_empty(node_pointer p_new_node) {
+        ++base_type::m_size;
+        base_type::m_p_head->m_p_left = base_type::m_p_head->m_p_right =
+        base_type::m_p_head->m_p_parent = p_new_node;
+
+        p_new_node->m_p_parent = base_type::m_p_head;
+        p_new_node->m_p_left = p_new_node->m_p_right = 0;
+        base_type::update_to_top(base_type::m_p_head->m_p_parent, (node_update *) this);
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __base_type__insert_leaf(node_pointer p_new_nd, node_pointer p_nd, bool left_nd) {
+        ++base_type::m_size;
+        if (left_nd) {
+            p_nd->m_p_left = p_new_nd;
+            if (base_type::m_p_head->m_p_left == p_nd)
+                base_type::m_p_head->m_p_left = p_new_nd;
+        } else {
+
+            p_nd->m_p_right = p_new_nd;
+            if (base_type::m_p_head->m_p_right == p_nd)
+                base_type::m_p_head->m_p_right = p_new_nd;
         }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        __base_type__insert_leaf_at(const_reference r_value, node_pointer x) {
-            if (base_type::m_size == 0) return base_type::insert_imp_empty(r_value);
-            if (x == base_type::m_p_head)
-                return base_type::insert_leaf_new(r_value, base_type::m_p_head->m_p_right, false);
-            if (x->m_p_left == nullptr)return base_type::insert_leaf_new(r_value, x, true);
-            x = x->m_p_left;
-            while (x->m_p_right != nullptr)x = x->m_p_right;
-            return base_type::insert_leaf_new(r_value, x, false);
-        }
+        p_new_nd->m_p_parent = p_nd;
+        p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
 
-        /*
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline std::pair<typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator, bool>
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        insert(const_reference r_value) {
+        base_type::update_to_top(p_new_nd, (node_update *) this);
+    }
 
-            std::pair<point_iterator, bool> ins_pair = base_type::insert_leaf(r_value);
-            if (ins_pair.second == true) {
-                ins_pair.first.m_p_nd->m_red = true;
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __insert(node_pointer p_new_nd, node_pointer p_nd) {
+        __base_type__insert_leaf_at(p_new_nd, p_nd);
+        p_new_nd->m_red = true;
+        insert_fixup(p_new_nd);
+        return point_iterator(p_new_nd);
+    }
 
-                insert_fixup(ins_pair.first.m_p_nd);
-            }
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __insert_back(node_pointer p_new_nd) {
+        if (base_type::m_size == 0) __base_type__insert_imp_empty(p_new_nd);
+        else __base_type__insert_leaf(p_new_nd, base_type::m_p_head->m_p_right, false);
+        p_new_nd->m_red = true;
+        insert_fixup(p_new_nd);
+        return point_iterator(p_new_nd);
+    }
 
-            return ins_pair;
-        }*/
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __insert_front(node_pointer p_new_nd) {
+        if (base_type::m_size == 0) __base_type__insert_imp_empty(p_new_nd);
+        else __base_type__insert_leaf(p_new_nd, base_type::m_p_head->m_p_left, true);
+        p_new_nd->m_red = true;
+        insert_fixup(p_new_nd);
+        return point_iterator(p_new_nd);
+    }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline void
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        insert_fixup(node_pointer p_nd) {
-            while (p_nd != base_type::m_p_head->m_p_parent && p_nd->m_p_parent->m_red) {
-                if (p_nd->m_p_parent == p_nd->m_p_parent->m_p_parent->m_p_left) {
-                    node_pointer p_y = p_nd->m_p_parent->m_p_parent->m_p_right;
-                    if (p_y != 0 && p_y->m_red) {
-                        p_nd->m_p_parent->m_red = false;
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    insert_fixup(node_pointer p_nd) {
+        while (p_nd != base_type::m_p_head->m_p_parent && p_nd->m_p_parent->m_red) {
+            if (p_nd->m_p_parent == p_nd->m_p_parent->m_p_parent->m_p_left) {
+                node_pointer p_y = p_nd->m_p_parent->m_p_parent->m_p_right;
+                if (p_y != 0 && p_y->m_red) {
+                    p_nd->m_p_parent->m_red = false;
                         p_y->m_red = false;
                         p_nd->m_p_parent->m_p_parent->m_red = true;
                         p_nd = p_nd->m_p_parent->m_p_parent;
@@ -278,42 +506,89 @@ namespace __gnu_pbds {
                         p_nd->m_p_parent->m_p_parent->m_red = true;
                         base_type::rotate_left(p_nd->m_p_parent->m_p_parent);
                     }
-                }
             }
-
-            base_type::update_to_top(p_nd, (node_update *) this);
-            base_type::m_p_head->m_p_parent->m_red = false;
         }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::iterator
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        erase(iterator it) {
+        base_type::update_to_top(p_nd, (node_update *) this);
+        base_type::m_p_head->m_p_parent->m_red = false;
+    }
 
-            if (it == base_type::end())
-                return it;
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_destroy(node_pointer p_nd) {
+        erase_node(p_nd);
+    }
 
-            iterator ret_it = it;
-            ++ret_it;
-            erase_node(it.m_p_nd);
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_destroy_front() {
+        if (base_type::m_p_head->m_p_left != base_type::m_p_head)erase_node(base_type::m_p_head->m_p_left);
+    }
 
-            return ret_it;
-        }
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_destroy_back() {
+        if (base_type::m_p_head->m_p_right != base_type::m_p_head)erase_node(base_type::m_p_head->m_p_right);
+    }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::reverse_iterator
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        erase(reverse_iterator it) {
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_get_ptr(node_pointer p_nd) {
+        remove_node(p_nd);
+        --base_type::m_size;
+        return p_nd;
+    }
 
-            if (it.m_p_nd == base_type::m_p_head)
-                return it;
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_get_ptr_front() {
+        node_pointer p_nd = base_type::m_p_head->m_p_left;
+        if (p_nd == base_type::m_p_head)return nullptr;
+        remove_node(p_nd);
+        --base_type::m_size;
+        return p_nd;
+    }
 
-            reverse_iterator ret_it = it;
-            ++ret_it;
-            erase_node(it.m_p_nd);
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_get_ptr_back() {
+        node_pointer p_nd = base_type::m_p_head->m_p_right;
+        if (p_nd == base_type::m_p_head)return nullptr;
+        remove_node(p_nd);
+        --base_type::m_size;
+        return p_nd;
+    }
 
-            return ret_it;
-        }
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_destroy_get_next(point_iterator it) {
+        if (it.m_p_nd == base_type::m_p_head)
+            return it;
+        point_iterator ret_it = it;
+        ++ret_it;
+        erase_node(it.m_p_nd);
+        return ret_it;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::point_iterator
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __erase_destroy_get_prev(point_iterator it) {
+        if (it.m_p_nd == base_type::m_p_head)
+            return it;
+        point_iterator ret_it = it;
+        --ret_it;
+        erase_node(it.m_p_nd);
+        return ret_it;
+    }
+
 
         template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
         template<typename Pred>
@@ -712,13 +987,12 @@ namespace __gnu_pbds {
 
         }
 
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        inline bool
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        is_effectively_black(const node_pointer p_nd) { return (p_nd == 0 || !p_nd->m_red); }
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline bool
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    is_effectively_black(node_pointer p_nd) { return (p_nd == 0 || !p_nd->m_red); }
 
     }
-}
 
 namespace alg {
     template<class T>
