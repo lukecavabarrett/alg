@@ -98,10 +98,41 @@ namespace __gnu_pbds::detail {
         };
 
     private:
+
+        inline size_t __check_validity(node_pointer, size_t);
+
+        inline void __check_validity();
+
         // node creation
         inline node_pointer __make_node_copy_constructor(const_reference);
 
         inline node_pointer __make_node_move_constructor(key_type &&);
+
+        // range algos
+        inline size_type __compute_range_black_height(size_type s);
+
+        template<typename InputIt>
+        node_pointer __make_node_range_n_rec(InputIt &, size_type, size_type);
+
+        node_pointer __make_node_range_constref_n_rec(const_reference, size_type, size_type);
+
+        template<typename InputIt>
+        inline node_pointer __make_node_range_n(InputIt, size_type);
+
+        inline node_pointer __make_node_range_constref_n(const_reference, size_type);
+
+        inline void __update_metadata_all_anomalous();
+
+        void __update_metadata_all();
+
+        template<typename InputIt>
+        inline void __construct_from_range_n(InputIt, size_type);
+
+        inline void __construct_from_range_constref_n(const_reference, size_type);
+
+        template<typename InputIt>
+        inline void __construct_from_range(InputIt, InputIt);
+
 
         template<class... Args>
         inline node_pointer __make_node_custom_constructor(Args &&... args);
@@ -141,18 +172,27 @@ namespace __gnu_pbds::detail {
 
     public:
 
+
+
         //constructors
 
         rb_tree_list();
 
-        //rb_tree_list(const Cmp_Fn &);
-
-        //rb_tree_list(const Cmp_Fn &, const node_update &);
-
         rb_tree_list(const rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
 
-        void
-        swap(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+        void swap(rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+
+        rb_tree_list(const rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &&o) : rb_tree_list() {
+            swap(o);
+        }
+
+        template<typename InputIt, typename = std::_RequireInputIter<InputIt> >
+        rb_tree_list(InputIt first, InputIt last) { __construct_from_range<InputIt>(first, last); };
+
+        rb_tree_list(std::initializer_list<key_type> init) { __construct_from_range_n(init.begin(), init.size()); }
+
+        rb_tree_list(size_type size, const_reference r_value) { __construct_from_range_constref_n(r_value, size); }
+
 
         template<typename It>
         void
@@ -204,9 +244,9 @@ namespace __gnu_pbds::detail {
 
         //erasers
 
-        iterator erase(iterator it) override { return __erase_destroy_get_next(it); }
+        iterator erase(iterator it) { return __erase_destroy_get_next(it); }
 
-        reverse_iterator erase(reverse_iterator it) override { return __erase_destroy_get_prev(it); }
+        reverse_iterator erase(reverse_iterator it) { return __erase_destroy_get_prev(it); }
 
         void pop_back() { __erase_destroy_front(); }
 
@@ -262,22 +302,25 @@ namespace __gnu_pbds::detail {
             void
             join_imp(node_pointer, node_pointer);
 
-            std::pair<node_pointer, node_pointer>
-            find_join_pos_right(node_pointer, size_type, size_type);
+        std::pair<node_pointer, node_pointer>
+        find_join_pos_right(node_pointer, size_type, size_type);
 
-            std::pair<node_pointer, node_pointer>
-            find_join_pos_left(node_pointer, size_type, size_type);
+        std::pair<node_pointer, node_pointer>
+        find_join_pos_left(node_pointer, size_type, size_type);
 
-            inline size_type
-            black_height(node_pointer);
+        inline size_type
+        black_height(node_pointer);
 
-        public:
-            void
-            split_at_node(node_pointer, rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+    public:
 
-            void
-            modify(point_iterator, const_reference);
-        };
+        size_type black_height() { return base_type::m_size ? black_height(base_type::m_p_head->m_p_parent) : 1; }
+
+        void
+        split_at_node(node_pointer, rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc> &);
+
+        void
+        modify(point_iterator, const_reference);
+    };
 
         template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
         template<typename It>
@@ -291,22 +334,6 @@ namespace __gnu_pbds::detail {
         template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
         rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
         rb_tree_list() {
-            initialize();
-
-        }
-
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        rb_tree_list(const Cmp_Fn &r_cmp_fn) :
-                base_type(r_cmp_fn) {
-            initialize();
-
-        }
-
-        template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
-        rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
-        rb_tree_list(const Cmp_Fn &r_cmp_fn, const node_update &r_node_update) :
-                base_type(r_cmp_fn, r_node_update) {
             initialize();
 
         }
@@ -403,6 +430,149 @@ namespace __gnu_pbds::detail {
     }
 
     template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::size_type
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __compute_range_black_height(size_type s) {
+        ++s;
+        size_type bh = 0;
+        while (s) {
+            ++bh;
+            s >>= 1;
+        }
+        return bh;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    template<typename InputIt>
+    typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_range_n_rec(InputIt &it, size_type size, size_type black_height) {
+        if (size == 0)return nullptr;
+        node_pointer ls = __make_node_range_n_rec(it, (size - 1) / 2, black_height - 1);
+        node_pointer p_new_nd = base_type::s_node_allocator.allocate(1);
+        new(const_cast<void * >(static_cast<const void * >(&p_new_nd->m_value)))
+                typename base_type::node::value_type(*it);
+        ++it;
+        p_new_nd->m_red = (black_height == 1);
+        node_pointer rs = __make_node_range_n_rec(it, size / 2, black_height - 1);
+        p_new_nd->m_p_left = ls;
+        if (ls)ls->m_p_parent = p_new_nd;
+        p_new_nd->m_p_right = rs;
+        if (rs)rs->m_p_parent = p_new_nd;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_range_constref_n_rec(const_reference r_value, size_type size, size_type black_height) {
+        if (size == 0)return nullptr;
+        node_pointer ls = __make_node_range_constref_n_rec(r_value, (size - 1) / 2, black_height - 1);
+        node_pointer p_new_nd = base_type::s_node_allocator.allocate(1);
+        new(const_cast<void * >(static_cast<const void * >(&p_new_nd->m_value)))
+                typename base_type::node::value_type(r_value);
+        p_new_nd->m_red = (black_height == 1);
+        node_pointer rs = __make_node_range_constref_n_rec(r_value, size / 2, black_height - 1);
+        p_new_nd->m_p_left = ls;
+        if (ls)ls->m_p_parent = p_new_nd;
+        p_new_nd->m_p_right = rs;
+        if (rs)rs->m_p_parent = p_new_nd;
+        return p_new_nd;
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    template<typename InputIt>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_range_n(InputIt first, size_type size) {
+        return __make_node_range_n_rec<InputIt>(first, size, __compute_range_black_height(size));
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline typename rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::node_pointer
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __make_node_range_constref_n(const_reference r_value, size_type size) {
+        return __make_node_range_constref_n_rec(r_value, size, __compute_range_black_height(size));
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    template<typename InputIt>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __construct_from_range_n(InputIt first, size_type size) {
+        typedef std::iterator_traits<InputIt> traits;
+        assert(base_type::m_size == 0);
+        node_pointer root = __make_node_range_n<InputIt>(first, size);
+        base_type::m_p_head->m_p_parent = root;
+        if (root)root->m_p_parent = base_type::m_p_head;
+        base_type::m_size = size;
+        base_type::m_p_head->m_red = true;
+        base_type::initialize_min_max();
+        __update_metadata_all();
+        __check_validity();
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __construct_from_range_constref_n(const_reference r_value, size_type size) {
+        assert(base_type::m_size == 0);
+        node_pointer root = __make_node_range_constref_n(r_value, size);
+        base_type::m_p_head->m_p_parent = root;
+        if (root)root->m_p_parent = base_type::m_p_head;
+        base_type::m_size = size;
+        base_type::m_p_head->m_red = true;
+        base_type::initialize_min_max();
+        __update_metadata_all();
+        __check_validity();
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    template<typename InputIt>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __construct_from_range(InputIt first, InputIt last) {
+        __construct_from_range_n<InputIt>(first, std::distance(first, last));
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    inline void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __update_metadata_all_anomalous() {
+        node_pointer p_nd = base_type::m_p_head->m_p_left;
+        if (p_nd == base_type::m_p_head)return;
+        if (p_nd->m_p_left != nullptr)base_type::apply_update(p_nd->m_p_left, (node_update *) this);
+        base_type::apply_update(p_nd, (node_update *) this);
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    void
+    rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
+    __update_metadata_all() {
+        if (base_type::m_p_head->m_p_right == base_type::m_p_head->m_p_parent)
+            return __update_metadata_all_anomalous();
+        node_pointer p_nd = base_type::m_p_head->m_p_left;
+        while (p_nd != base_type::m_p_head) {
+            // do things
+            //base_type::apply_update(p_nd, (node_update *) this);
+            //increment
+            if (p_nd->m_p_right != nullptr) {
+                p_nd = p_nd->m_p_right;
+                while (p_nd->m_p_left != nullptr)p_nd = p_nd->m_p_left;
+            } else {
+                node_pointer p_nd_parent = p_nd->m_p_parent;
+                while (p_nd_parent->m_p_right == p_nd) {
+                    base_type::apply_update(p_nd, (node_update *) this);
+                    p_nd = p_nd_parent;
+                    p_nd_parent = p_nd_parent->m_p_parent;
+                }
+                base_type::apply_update(p_nd, (node_update *) this);
+                p_nd = p_nd_parent;
+            }
+        }
+    }
+
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
     inline void
     rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
     __base_type__insert_imp_empty(node_pointer p_new_node) {
@@ -412,6 +582,8 @@ namespace __gnu_pbds::detail {
 
         p_new_node->m_p_parent = base_type::m_p_head;
         p_new_node->m_p_left = p_new_node->m_p_right = 0;
+
+        //TODO: remove if possible
         base_type::update_to_top(base_type::m_p_head->m_p_parent, (node_update *) this);
     }
 
@@ -434,6 +606,7 @@ namespace __gnu_pbds::detail {
         p_new_nd->m_p_parent = p_nd;
         p_new_nd->m_p_left = p_new_nd->m_p_right = 0;
 
+        //TODO: remove if possible
         base_type::update_to_top(p_new_nd, (node_update *) this);
     }
 
@@ -992,30 +1165,38 @@ namespace __gnu_pbds::detail {
     rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::
     is_effectively_black(node_pointer p_nd) { return (p_nd == 0 || !p_nd->m_red); }
 
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    size_t rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::__check_validity(node_pointer p_nd,
+                                                                                           size_t black_height) {
+        if (p_nd == nullptr) {
+            assert(black_height == 1);
+            return 0;
+        }
+        if (p_nd->m_red)assert(p_nd->m_p_parent->m_red == false);
+        else --black_height;
+        return 1 + __check_validity(p_nd->m_p_left, black_height) + __check_validity(p_nd->m_p_right, black_height);
     }
 
-namespace alg {
-    template<class T>
-    constexpr
-    std::string_view
-    type_name() {
-        using namespace std;
-#ifdef __clang__
-        string_view p = __PRETTY_FUNCTION__;
-    return string_view(p.data() + 34, p.size() - 34 - 1);
-#elif defined(__GNUC__)
-        string_view p = __PRETTY_FUNCTION__;
-#  if __cplusplus < 201402
-        return string_view(p.data() + 36, p.size() - 36 - 1);
-#  else
-        return string_view(p.data() + 49, p.find(';', 49) - 49);
-#  endif
-#elif defined(_MSC_VER)
-        string_view p = __FUNCSIG__;
-    return string_view(p.data() + 84, p.size() - 84 - 7);
-#endif
+    template<typename Key, typename Mapped, typename Cmp_Fn, typename Node_And_It_Traits, typename _Alloc>
+    void rb_tree_list<Key, Mapped, Cmp_Fn, Node_And_It_Traits, _Alloc>::__check_validity() {
+        assert(base_type::m_p_head->m_red == true);
+        if (base_type::m_size == 0) {
+            // empty tree
+            assert(base_type::m_p_head->m_p_parent == nullptr);
+            assert(base_type::m_p_head->m_p_left == base_type::m_p_head);
+            assert(base_type::m_p_head->m_p_right = base_type::m_p_head);
+            assert(base_type::m_size == 0);
+        } else {
+            // non-empty tree
+            node_pointer root = base_type::m_p_head->m_p_parent;
+            assert(root->m_red == false);
+            size_type bh = black_height(root);
+            assert(__check_validity(root, bh) == base_type::m_size);
+        }
     }
+
 }
+
 
 namespace alg {
 
@@ -1028,7 +1209,6 @@ namespace alg {
     //__gnu_pbds::detail::rb_tree_set<int, __gnu_pbds::null_type, std::less<int>, __gnu_pbds::detail::tree_traits<int, __gnu_pbds::null_type, std::less<int>, __gnu_pbds::tree_order_statistics_node_update, __gnu_pbds::rb_tree_tag, std::allocator<char> >, std::allocator<char> >
 }
 
-#include <iostream>
 
 namespace alg {
     namespace detail {

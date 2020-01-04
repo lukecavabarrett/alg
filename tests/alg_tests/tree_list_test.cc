@@ -4,15 +4,39 @@
 
 #include "gtest/gtest.h"
 
-namespace alg {
-namespace {
 
-TEST(TreeList,Build){
-        tree_list<float> tlf;
-        tree_list<double> tld;
-        tree_list<int> tli;
-        tree_list<char *> tlpc;
+namespace alg {
+    template<class T>
+    constexpr
+    std::string_view
+    type_name() {
+        using namespace std;
+#ifdef __clang__
+        string_view p = __PRETTY_FUNCTION__;
+    return string_view(p.data() + 34, p.size() - 34 - 1);
+#elif defined(__GNUC__)
+        string_view p = __PRETTY_FUNCTION__;
+#  if __cplusplus < 201402
+        return string_view(p.data() + 36, p.size() - 36 - 1);
+#  else
+        return string_view(p.data() + 49, p.find(';', 49) - 49);
+#  endif
+#elif defined(_MSC_VER)
+        string_view p = __FUNCSIG__;
+    return string_view(p.data() + 84, p.size() - 84 - 7);
+#endif
+    }
 }
+
+namespace alg {
+    namespace {
+
+        TEST(TreeList, Build) {
+            tree_list<float> tlf;
+            tree_list<double> tld;
+            tree_list<int> tli;
+            tree_list<char *> tlpc;
+        }
 
     TEST(TreeList,OrderStatistic){
         tree_list<int,__gnu_pbds::tree_order_statistics_node_update> t;
@@ -211,17 +235,108 @@ TEST(TreeList,Build){
             fprintf(stdout, "Last. Holding it until out-of-scope\n");
             auto nh_last = t1.extract(t1.begin());
         } // Trigger destructors
-        EXPECT_EQ(cint::n_instances, 0);
-    }
-
-    TEST(TreeList, Miscellanea) {
-        alg::tree_list<int, __gnu_pbds::tree_order_statistics_node_update> t;
-        std::vector<int> data = {4, 5, 3, 6, 2, 7};
-        for (const int &x : data) {
-            std::cout << "inserting " << x << std::endl;
-            t.insert(t.end(), x);
+            EXPECT_EQ(cint::n_instances, 0);
         }
-        //t.copy_from_range(data.begin(),data.end());
+
+        TEST(TreeList, RangeBuild) {
+            typedef alg::tree_list<int, max_prefix_policy> tree;
+            tree t0 = {};
+            tree t1 = {1};
+            tree t2 = {1, 2};
+            tree t3 = {1, 2, 3};
+            tree t_large(1000000, 42);
+            std::cout << "expect 42,000,000" << std::endl;
+            std::cout << t_large.get_max_prefix() << std::endl;
+            for (auto it = t_large.begin(); it != t_large.end(); ++it) {
+                t_large.modify(it, (rand() % 100) - 40);
+            }
+            std::cout << t_large.get_max_prefix() << std::endl;
+        }
+
+        namespace test {
+
+            constexpr std::size_t TIME_ZERO = 0, NULL_ID = -1, UNINITIALIZED_ID = -2;
+            std::size_t gl_clock = TIME_ZERO, gl_n_calls = 0, gl_n_wasted_calls = 0;
+            struct metadata_struct {
+                std::size_t id = UNINITIALIZED_ID, last_updated = TIME_ZERO, last_updated_true = TIME_ZERO, last_left_id = UNINITIALIZED_ID, last_right_id = UNINITIALIZED_ID;
+            };
+
+            template<typename Node_CItr, typename Node_Itr, typename Cmp_Fn, typename _Alloc>
+            class observer_policy : private __gnu_pbds::detail::branch_policy<Node_CItr, Node_Itr, _Alloc> {
+            private:
+                typedef __gnu_pbds::detail::branch_policy<Node_CItr, Node_Itr, _Alloc> base_type;
+            public:
+
+                typedef typename base_type::key_type key_type;
+                typedef typename base_type::key_const_reference key_const_reference;
+
+                typedef Node_CItr node_const_iterator;
+                typedef Node_Itr node_iterator;
+                typedef typename node_iterator::value_type iterator;
+                typedef typename std::remove_pointer_t<iterator> value_type;
+                typedef metadata_struct metadata_type;
+                typedef metadata_type &metadata_reference;
+
+                void operator()(Node_Itr nd_it, Node_CItr end_nd_it) {
+                    ++gl_clock;
+                    metadata_reference md = const_cast<metadata_reference >(nd_it.get_metadata());
+                    node_iterator l_it = nd_it.get_l_child();
+                    node_iterator r_it = nd_it.get_r_child();
+
+
+                    std::size_t l_id = l_it != end_nd_it ? l_it.get_metadata().id : NULL_ID;
+                    std::size_t r_id = r_it != end_nd_it ? r_it.get_metadata().id : NULL_ID;
+                    std::size_t l_upd = l_it != end_nd_it ? l_it.get_metadata().last_updated_true : TIME_ZERO;
+                    std::size_t r_upd = r_it != end_nd_it ? r_it.get_metadata().last_updated_true : TIME_ZERO;
+
+                    bool req = false;
+                    req |= md.last_left_id != l_id;
+                    req |= md.last_right_id != r_id;
+                    req |= md.last_updated < std::max(l_upd, r_upd);
+                    ++gl_n_calls;
+                    if (!req)++gl_n_wasted_calls;
+
+                    if (md.id == UNINITIALIZED_ID)md.id = gl_clock;
+                    md.last_updated = gl_clock;
+                    if (req)md.last_updated_true = gl_clock;
+                    md.last_left_id = l_id;
+                    md.last_right_id = r_id;
+                }
+
+                virtual Node_CItr
+                node_begin() const = 0;
+
+                virtual Node_CItr
+                node_end() const = 0;
+            };
+
+        }
+
+        TEST(TreeList, MetadataUpdates) {
+            alg::tree_list<int, test::observer_policy> t;
+            constexpr int n_test = 10000;
+            for (int i = 0; i < n_test; ++i)t.push_back(i);
+
+            //test::gl_n_wasted_calls=test::gl_n_calls=0;
+
+            t.push_back(n_test);
+
+            std::cout << " --- report ---" << std::endl;
+            std::cout << " n_calls: " << test::gl_n_calls << std::endl;
+            std::cout << " n_wasted_calls: " << test::gl_n_wasted_calls << std::endl;
+            std::cout << " efficiency: " << 100 * double(test::gl_n_calls - test::gl_n_wasted_calls) / test::gl_n_calls
+                      << "%" << std::endl;
+        }
+
+
+        TEST(TreeList, Miscellanea) {
+            alg::tree_list<int, __gnu_pbds::tree_order_statistics_node_update> t;
+            std::vector<int> data = {4, 5, 3, 6, 2, 7};
+            for (const int &x : data) {
+                std::cout << "inserting " << x << std::endl;
+                t.insert(t.end(), x);
+            }
+            //t.copy_from_range(data.begin(),data.end());
         t.erase(t.begin());
         t.erase(t.rbegin());
         EXPECT_EQ(*t.find_by_order(3), 2);
