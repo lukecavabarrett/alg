@@ -1,5 +1,6 @@
 include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
-include_directories(/Users/apple/CLionProjects/alg/src)
+include_directories(/home/luke/CLionProjects/alg/src)
+
 
 
 macro(testing_unit)
