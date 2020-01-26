@@ -31,14 +31,64 @@ TEST(SuffixArray,SuffixBlockCompress){
   EXPECT_EQ(v,std::vector<uint16_t >({2,1,3,1,3,0}));
 }
 
-TEST(SuffixArray,SuffixCompress){
+TEST(SuffixArray,SuffixCompressNlogN){
   std::vector<uint16_t> v = {2,1,3,1,3,1};
   alg::compress_suffix_nlogn(v.begin(),v.end(),v.begin());
-  //EXPECT_EQ(v,std::vector<uint16_t >({5,2,4,1,3,0}));
+  EXPECT_EQ(v,std::vector<uint16_t >({3,2,5,1,4,0}));
 }
 
-TEST(SuffixArray,Simple){
+TEST(SuffixArray,SuffixCompressInsertion){
+  std::vector<uint16_t> v = {2,1,3,1,3,1};
+  alg::compress_suffix_insertion(v.begin(),v.end(),v.begin());
+  EXPECT_EQ(v,std::vector<uint16_t >({3,2,5,1,4,0}));
+}
 
+TEST(SuffixArray,SuffixCompressInsertionSmall){
+  std::vector<uint16_t> v = {1,3,4,0};
+  alg::qd_suffix_insertion(v.begin(),v.size());
+  EXPECT_EQ(v,std::vector<uint16_t >({3,0,1,2}));
+}
+
+TEST(SuffixArray,SuffixArrayKsBanana){
+  std::vector<uint16_t> v = {2,1,3,1,3,1};
+  alg::ks_suffix_array(v.begin(),v.size());
+  EXPECT_EQ(v,std::vector<uint16_t >({5,3,1,0,4,2}));
+}
+
+TEST(SuffixArray,SuffixArrayKsAs){
+  std::vector<uint16_t> v(10,0);
+  alg::ks_suffix_array(v.begin(),v.size());
+  EXPECT_EQ(v,std::vector<uint16_t >({9,8,7,6,5,4,3,2,1,0}));
+}
+
+TEST(SuffixArray,SuffixArrayKsAAAs){
+  constexpr int n = 1000;
+  std::vector<unsigned int> v(n,0);
+  alg::ks_suffix_array(v.begin(),n);
+  std::vector<unsigned int> vsa(n,0);
+  std::iota(vsa.rbegin(),vsa.rend(),0);
+  EXPECT_EQ(v,vsa);
+}
+
+TEST(SuffixArray,SuffixArrayBanana){
+  constexpr std::string_view s = "banana";
+  std::vector<unsigned int> sa(s.size());
+  alg::suffix_array(s.begin(),s.end(),sa.begin());
+  EXPECT_EQ(sa,std::vector<unsigned int>({5,3,1,0,4,2}));
+}
+
+TEST(SuffixArray,SuffixArrayMississippi){
+  constexpr std::string_view s = "mississippi";
+  std::vector<unsigned int> sa(s.size());
+  alg::suffix_array(s.begin(),s.end(),sa.begin());
+  EXPECT_EQ(sa,std::vector<unsigned int>({10, 7, 4, 1, 0, 9, 8, 6, 3, 5, 2}));
+}
+
+TEST(SuffixArray,SuffixArrayA){
+  constexpr std::string_view s = "a";
+  std::vector<unsigned int> sa(s.size());
+  alg::suffix_array(s.begin(),s.end(),sa.begin());
+  EXPECT_EQ(sa,std::vector<unsigned int>({0}));
 }
 
 }
